@@ -1,7 +1,6 @@
 #include "graph.h"
 
 
-/* Самостоятельная FIFO-очередь на односвязном списке. */
 struct LinkedQueue {
     Node *head=nullptr, *tail=nullptr;
     void push(int v) {
@@ -15,8 +14,6 @@ struct LinkedQueue {
     }
     bool empty() const { return head==nullptr; }
 };
-/* mode: 0 — матрица/std::queue, 1 — матрица/своя очередь,
-   2 — списки/std::queue. Обход всего графа, включая изолированные вершины. */
 int traverse(const Graph *g,int start,int mode,int *order) {
     int *seen=(int *)allocate(g->n,sizeof(int)), count=0, components=0;
     for(int k=0;k<=g->n;++k) {
