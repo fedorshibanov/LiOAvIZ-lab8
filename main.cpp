@@ -2,49 +2,50 @@
 
 
 struct LinkedQueue {
-    Node *head=nullptr, *tail=nullptr;
+    Node *pool=nullptr, *head=nullptr, *tail=nullptr; int used=0;
     void push(int v) {
-        Node *p=(Node *)allocate(1,sizeof(Node)); p->vertex=v;
+        Node *p=&pool[used++]; p->vertex=v; p->next=nullptr;
         if(tail) tail->next=p; else head=p;
         tail=p;
     }
     int pop() {
-        Node *p=head; int v=p->vertex;
-        head=p->next; if(!head) tail=nullptr; free(p); return v;
+        Node *p=head;
+        head=p->next; if(!head) tail=nullptr; return p->vertex;
     }
     bool empty() const { return head==nullptr; }
 };
-void traverse(const Graph *g,int start,int mode,int *order) {
-    int *seen=(int *)allocate(g->n,sizeof(int)), count=0;
+void traverse(const Graph *g,int start,int mode,int *order,int *seen,Node *pool) {
+    int count=0;
+    for(int i=0;i<g->n;++i) seen[i]=0;
+    bool mine=mode==1 || mode==3;
+    std::queue<int> q; LinkedQueue own; own.pool=pool;
     for(int k=0;k<=g->n;++k) {
         int root=k==0 ? start : k-1;
         if(seen[root]) continue;
-        std::queue<int> q; LinkedQueue own;
-        seen[root]=1; if(mode==1) own.push(root); else q.push(root);
-        while(mode==1 ? !own.empty() : !q.empty()) {
+        seen[root]=1; if(mine) own.push(root); else q.push(root);
+        while(mine ? !own.empty() : !q.empty()) {
             int u;
-            if(mode==1) u=own.pop(); else {u=q.front(); q.pop();}
+            if(mine) u=own.pop(); else {u=q.front(); q.pop();}
             order[count++]=u;
-            if(mode==2) {
+            if(mode>=2) {
                 for(Node *p=g->adj[u];p;p=p->next) if(!seen[p->vertex]) {
-                    seen[p->vertex]=1; q.push(p->vertex);
+                    seen[p->vertex]=1; if(mine) own.push(p->vertex); else q.push(p->vertex);
                 }
             } else for(int v=0;v<g->n;++v) if(g->a[u*g->n+v] && !seen[v]) {
-                seen[v]=1; if(mode==1) own.push(v); else q.push(v);
+                seen[v]=1; if(mine) own.push(v); else q.push(v);
             }
         }
     }
-    free(seen);
 }
 
 
-void benchmark(const Graph *g,int *order) {
-    puts("Среднее время CPU за 100 обходов, мс");
-    puts("n; matrix_std_ms; matrix_linked_ms");
+void benchmark(const Graph *g,int *order,int *seen,Node *pool) {
+    puts("Среднее время, мс");
+    puts("n; matrix_std_ms; matrix_linked_ms; lists_std_ms; lists_linked_ms");
     printf("%d",g->n);
-    for(int mode=0;mode<2;++mode) {
+    for(int mode=0;mode<4;++mode) {
         double start=now_ms();
-        for(int r=0;r<100;++r) traverse(g,0,mode,order);
+        for(int r=0;r<100;++r) traverse(g,0,mode,order,seen,pool);
         printf("; %.6f",(now_ms()-start)/100);
     }
     puts("");
@@ -72,13 +73,18 @@ int main() {
     print_matrix(&g);
     print_lists(&g);
     int *order=(int *)allocate(g.n,sizeof(int));
-    const char *names[]={"BFS матрица / std::queue:","BFS матрица / своя очередь:","BFS списки / std::queue:"};
-    for(int mode=0;mode<3;++mode) {
-        traverse(&g,0,mode,order);
+    int *seen=(int *)allocate(g.n,sizeof(int));
+    Node *pool=(Node *)allocate(g.n,sizeof(Node));
+    const char *names[]={"BFS матрица / std::queue:","BFS матрица / своя очередь:",
+                         "BFS списки / std::queue:","BFS списки / своя очередь:"};
+    for(int mode=0;mode<4;++mode) {
+        traverse(&g,0,mode,order,seen,pool);
         for(int i=0;i<g.n;++i) ++order[i];
         print_vector(names[mode],order,g.n);
     }
-    benchmark(&g,order);
+    benchmark(&g,order,seen,pool);
+    free(pool);
+    free(seen);
     free(order);
     graph_free(&g);
     return 0;
